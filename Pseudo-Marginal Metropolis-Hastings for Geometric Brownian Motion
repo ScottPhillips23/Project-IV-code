@@ -1,0 +1,138 @@
+library(mvnfast)
+library(Matrix)
+
+simanalytic <- function(mu, sigma, x0, t, dt){
+  N <- t/dt
+  vec <- numeric(N)
+  vec[1] <- x0
+  for(i in 2:N){
+    x <- vec[i-1]
+    vec[i] <- rlnorm(1, log(x) + (mu - sigma^2/2)*dt, sigma*sqrt(dt))
+  }
+  return(vec)
+}
+
+GBsimEM <- function(mu, sigma, x0, T, dt){
+  N <- T/dt
+  vec <- numeric(N)
+  vec[1] <- x0
+  for(i in  2:N){
+    xs <- vec[i-1]
+    if(xs <=0.00001){
+      xs <- 0.00001
+    }
+    vec[i] <-  rnorm(1, xs + mu*xs*dt, sigma*xs*sqrt(dt))
+  }
+  return(vec)
+}
+
+DGBridge <- function(x0, xT, sigma, T, dt){
+  N <- T/dt + 1
+  sim <- numeric(N)
+  sim[1] <- x0
+  sim[N] <- xT
+  for(i in 1:(N-2)){
+    xt <- sim[i]
+    sim[i+1] <- rnorm(1, 
+                      xt + dt * (xT - xt) / (T - (i-1) * dt), 
+                      sigma * xt * sqrt(dt * (T - (i) * dt) / (T - (i-1) * dt)))
+    if(sim[i+1] < 0){
+      sim[i+1] <- 0.01
+    }
+  }
+  return(sim)
+}
+
+demlike <- function(sigma, T, dt, data){
+  N <- length(data)
+  llike <- 0
+  xT <- data[N]
+  for(i in 1:(N-2)){
+    xt <- data[i]
+    mean <- xt + dt * (xT - xt) / (T - ((i-1) * dt))
+    sd <- sigma * xt * sqrt(dt * (T - (i) * dt)/(T - (i-1)*dt))
+    llike <- llike + dnorm(data[i+1], 
+                           mean = mean,
+                           sd = sd,
+                           log = TRUE)
+  }
+  return(llike)
+}
+
+numlike <- function(mu, sigma, dt, data){
+  N <- length(data)
+  llike <- 0
+  for(i in 1:(N-1)){
+    xt <- data[i]
+    mean <- xt + mu * xt * dt
+    sd <- sigma * xt * sqrt(dt)
+    llike <- llike + dnorm(data[i+1], 
+                           mean = mean, 
+                           sd = sd,
+                           log = TRUE)
+  }
+  return(llike)
+}
+
+resampling <- function(mu, sigma, x0, xT, T, dt, bridges){
+  N <- T/dt
+  weights <- numeric(bridges)
+  for(i in 1:bridges){
+    sim <- DGBridge(x0, xT, sigma, T, dt)
+    num <- numlike(mu, sigma, dt, sim)
+    dem <- demlike(sigma, T, dt, sim)
+    weights[i] <- num-dem
+  }
+  weight <- exp(weights)
+  lphat <- log(mean(weight))
+  return(lphat)
+}
+
+lprior <- function(param){
+  mu <- c(5, 0.5)
+  sigma <- Diagonal(length(param), c(1, 0.5))
+  lp <- sum(dmvn(param, mu, sigma, log = TRUE))
+  return(lp)
+}
+
+llike <- function(mu, sigma, X, T, dt, bridges){
+  N <- length(X)
+  llike <- 0
+  for(i in 1:(N-1)){
+    llike <- llike + resampling(mu, sigma, X[i], X[i+1], T, dt, bridges)
+  }
+  return(llike)
+}
+
+PMMH_bridge <- function(param, X, T, dt, bridges, iters, param_sd) {
+  start <- Sys.time()
+  count <- 0
+  param_samples <- matrix(nrow = iters+1, ncol = length(param))
+  param_samples[1,] <- param
+  current_loglik <- llike(param[1], param[2], X, T, dt, bridges)
+  for(i in 1:(iters)){
+    print(i)
+    phi <- param_samples[i,]
+    can <- rmvn(1, param_samples[i,], param_sd)
+    if (can[,1] <= 0.00002) {
+      param_samples[i+1,] <- param_samples[i,]
+      next
+    }
+    if (can[,2] <= 0.00002) {
+      param_samples[i+1,] <- param_samples[i,]
+      next
+    }
+    proposed_loglik <- llike(can[1], can[2], X, T, dt, bridges)
+    laprob <- proposed_loglik - current_loglik + lprior(can) - lprior(param_samples[i,])
+    if (log(runif(1)) < laprob) {
+      phi <- can
+      current_loglik <- proposed_loglik
+      count <- count + 1
+    }
+    param_samples[i+1, ] <- phi
+  }
+  end <- Sys.time()
+  time <- end-start
+  print(count/nrow(param_samples))
+  return(list(param_samples, count/nrow(param_samples), time))
+}
