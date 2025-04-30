@@ -1,0 +1,221 @@
+#Generate Synthetic Data
+
+set.seed(3)
+out2 <- LVsimEM(c(0.5, 0.0025, 0.3), c(50, 50), 50, 0.001)
+plot(ts(out2))
+out3 <- out2[1,]
+out3
+for(i in 2:50){
+  out3 <- rbind(out3, out2[i*1000,])
+  
+}
+out3 <- as.matrix(out3)
+
+out300 <- out3[1,]
+for(i in 1:500){
+  out300 <- rbind(out300, out2[i*100,])
+}
+
+out30 <- out3[1,]
+for(i in 1:10){
+  out30 <- rbind(out30, out3[i*5,])
+}
+
+#Out30 = 10 Data points
+#Out3 = 50 data points
+#Out300 = 500 Data points
+
+
+
+
+#Gibbs Run 1
+
+set.seed(3)
+Gibbs_results_initial4 <- Gibbs(out30, c(0.9, 0.05, 0.7), matrix(c(0.001, 0, 0, 0, 0.00001, 0, 0, 0, 0.001), nrow = 3),
+                                5, 0.25, 10000)
+
+Gibbs_tune4 <- var(Gibbs_results_initial4[[1]])
+
+set.seed(3)
+Gibbs_results_tune4 <- Gibbs(out30, c(0.9, 0.05, 0.7), Gibbs_tune4*(2.38)^2/3, 5, 0.25, 10000)
+
+
+
+
+#Gibbs Run 2
+
+set.seed(3)
+Gibbs_results_initial2 <- Gibbs(out3, c(0.9, 0.05, 0.7), matrix(c(0.001, 0, 0, 0, 0.00001, 0, 0, 0, 0.001), nrow = 3),
+                                1, 0.05, 10000)
+
+Gibbs_tune2 <- var(Gibbs_results_initial2[[1]])
+
+set.seed(3)
+Gibbs_results_tune2 <- Gibbs(out3, c(0.9, 0.05, 0.7), Gibbs_tune2*(2.38)^2/3, 1, 0.05, 10000)
+
+
+
+
+#Gibbs Run 3
+
+set.seed(3)
+Gibbs_results_initial5 <- Gibbs(out300, c(0.9, 0.05, 0.7), matrix(c(0.001, 0, 0, 0, 0.00001, 0, 0, 0, 0.001), nrow = 3),
+                                0.1, 0.025, 10000)
+
+Gibbs_tune5 <- var(Gibbs_results_initial5[[1]])
+
+set.seed(3)
+Gibbs_results_tune5 <- Gibbs(out300, c(0.9, 0.05, 0.7), Gibbs_tune5*(2.38)^2/3, 0.1, 0.025, 10000)
+
+
+
+
+#PMMH Run 1
+
+set.seed(1)
+PMMH_results_initial17 <- PMMH_bridge_multi(c(0.9, 0.05, 0.7), out30, 5, 1.25, 30, 10000, 
+                                            matrix(c(0.0001, 0, 0, 0, 0.000001, 0, 0, 0, 0.0001), nrow = 3))
+
+PMMH_tune17 <- var(PMMH_results_initial17[[1]])
+
+set.seed(1)
+PMMH_results_tune17 <- PMMH_bridge_multi(c(0.9, 0.05, 0.7), out30, 5, 1.25, 30, 10000, PMMH_tune17*(2.562)^2/3)
+
+
+
+
+#PMMH Run 2
+
+set.seed(1)
+PMMH_results_initial12 <- PMMH_bridge_multi(c(0.9, 0.05, 0.7), out3, 1, 0.05, 30, 10000, 
+                                           matrix(c(0.001, 0, 0, 0, 0.00001, 0, 0, 0, 0.001), nrow = 3))
+
+PMMH_tune12 <- var(PMMH_results_initial12[[1]][1000:10000,])
+
+set.seed(1)
+PMMH_results_tune12 <- PMMH_bridge_multi(c(0.9, 0.05, 0.7), out3, 1, 0.05, 30, 10000, PMMH_tune12*(2.562)^2/3)
+
+
+
+
+#PMMH Run 3
+
+set.seed(1)
+PMMH_results_initial15 <- PMMH_bridge_multi(c(0.9, 0.05, 0.7), out300, 0.1, 0.025, 30, 10000, 
+                                            matrix(c(0.001, 0, 0, 0, 0.00001, 0, 0, 0, 0.001), nrow = 3))
+
+PMMH_tune15 <- var(PMMH_results_initial15[[1]][1000:10000,])
+
+set.seed(1)
+PMMH_results_tune15 <- PMMH_bridge_multi(c(0.9, 0.05, 0.7), out300, 0.1, 0.025, 30, 10000, 
+                                         PMMH_tune15*(2.562)^2/3)
+
+
+#Burn in is calculated by looking at tsplot() of the tuned output.
+
+#Calculate ACF of runs
+
+ACF_Gibbs4 <- acf(Gibbs_results_tune4[[1]][100:10000,], plot = FALSE, lag.max = 150)
+ACF_Gibbs5 <- acf(Gibbs_results_tune2[[1]][100:10000,], plot = FALSE, lag.max = 150)
+ACF_Gibbs6 <- acf(Gibbs_results_tune5[[1]][100:10000,], plot = FALSE, lag.max = 150)
+
+ACF_PMMH4 <- acf(PMMH_results_tune17[[1]][4500:10000,], plot = FALSE, lag.max = 150)
+ACF_PMMH5 <- acf(PMMH_results_tune12[[1]][5400:10000,], plot = FALSE, lag.max = 150)
+ACF_PMMH6 <- acf(PMMH_results_tune15[[1]][1800:10000,], plot = FALSE, lag.max = 150)
+
+#Autocorrelation plots
+
+par(mfrow = c(3,3))
+
+plot(ACF_Gibbs4$acf[,1,1], ylab = 'Correlation', type = 'l', lty = 1, ylim = c(-0.1,1), xlab = expression(theta[1] ~ "Index"))
+lines(ACF_PMMH4$acf[,1,1], lty = 2)
+abline(h = 0)
+
+plot(ACF_Gibbs4$acf[,2,2], ylab = '', type = 'l', lty = 1, ylim = c(-0.1,1), xlab = expression(theta[2] ~ "Index"))
+lines(ACF_PMMH4$acf[,2,2], lty = 2)
+abline(h = 0)
+
+plot(ACF_Gibbs4$acf[,3,3], ylab = '', type = 'l', lty = 1, ylim = c(-0.1,1), xlab = expression(theta[3] ~ "Index"))
+lines(ACF_PMMH4$acf[,3,3], lty = 2)
+abline(h = 0)
+
+plot(ACF_Gibbs5$acf[,1,1], ylab = 'Correlation', type = 'l', lty = 1, ylim = c(-0.1,1), xlab = expression(theta[1] ~ "Index"))
+lines(ACF_PMMH5$acf[,1,1], lty = 2)
+abline(h = 0)
+
+plot(ACF_Gibbs5$acf[,2,2], ylab = 'Correlation', type = 'l', lty = 1, ylim = c(-0.1,1), xlab = expression(theta[2] ~ "Index"))
+lines(ACF_PMMH5$acf[,2,2], lty = 2)
+abline(h = 0)
+
+plot(ACF_Gibbs5$acf[,3,3], ylab = 'Correlation', type = 'l', lty = 1, ylim = c(-0.1,1), xlab = expression(theta[3] ~ "Index"))
+lines(ACF_PMMH5$acf[,3,3], lty = 2)
+abline(h = 0)
+
+plot(ACF_Gibbs6$acf[,1,1], ylab = 'Correlation', type = 'l', lty = 1, ylim = c(-0.1,1), xlab = expression(theta[1] ~ "Index"))
+lines(ACF_PMMH6$acf[,1,1], lty = 2)
+abline(h = 0)
+
+plot(ACF_Gibbs6$acf[,2,2], ylab = 'Correlation', type = 'l', lty = 1, ylim = c(-0.1,1), xlab = expression(theta[2] ~ "Index"))
+lines(ACF_PMMH6$acf[,2,2], lty = 2)
+abline(h = 0)
+
+plot(ACF_Gibbs6$acf[,3,3], ylab = 'Correlation', type = 'l', lty = 1, ylim = c(-0.1,1), xlab = expression(theta[3] ~ "Index"))
+lines(ACF_PMMH6$acf[,3,3], lty = 2)
+abline(h = 0)
+
+#Density Plots 
+
+plot(density(Gibbs_results_tune4[[1]][100:10000,1], adjust = 3), main = '', xlab = expression(theta[1]), ylim = c(0,40))
+lines(density(PMMH_results_tune17[[1]][4500:10000,1], adjust = 3), lty = 2)
+abline(v = 0.5, col = 'red')
+
+plot(density(Gibbs_results_tune4[[1]][100:10000,2], adjust = 3), main = '', xlab = expression(theta[2]), ylim = c(0, 6000))
+lines(density(PMMH_results_tune17[[1]][4500:10000,2], adjust = 3), lty = 2)
+abline(v = 0.0025, col = 'red')
+
+plot(density(Gibbs_results_tune4[[1]][100:10000,3], adjust = 3), main = '', xlab = expression(theta[3]), ylim = c(0, 80))
+lines(density(PMMH_results_tune17[[1]][4500:10000,3], adjust = 3), lty = 2)
+abline(v = 0.3, col = 'red')
+
+plot(density(Gibbs_results_tune2[[1]][100:10000,1], adjust = 3), main = '', xlab = expression(theta[1]))
+lines(density(PMMH_results_tune12[[1]][5400:10000,1], adjust = 3), lty = 2)
+abline(v = 0.5, col = 'red')
+
+plot(density(Gibbs_results_tune2[[1]][100:10000,2], adjust = 3), main = '', xlab = expression(theta[2]), ylim = c(0, 8000))
+lines(density(PMMH_results_tune12[[1]][5400:10000,2], adjust = 3), lty = 2)
+abline(v = 0.0025, col = 'red')
+
+plot(density(Gibbs_results_tune2[[1]][100:10000,3], adjust = 3), main = '', xlab = expression(theta[3]))
+lines(density(PMMH_results_tune12[[1]][5400:10000,3], adjust = 3), lty = 2)
+abline(v = 0.3, col = 'red')
+
+plot(density(Gibbs_results_tune5[[1]][100:10000,1], adjust = 3), main = '', xlab = expression(theta[1]))
+lines(density(PMMH_results_tune15[[1]][100:10000,1], adjust = 3), lty = 2)
+abline(v = 0.5, col = 'red')
+
+plot(density(Gibbs_results_tune5[[1]][100:10000,2], adjust = 3), main = '', xlab = expression(theta[2]))
+lines(density(PMMH_results_tune15[[1]][100:10000,2], adjust = 3), lty = 2)
+abline(v = 0.0025, col = 'red')
+
+plot(density(Gibbs_results_tune5[[1]][100:10000,3], adjust = 3), main = '', xlab = expression(theta[3]))
+lines(density(PMMH_results_tune15[[1]][100:10000,3], adjust = 3), lty = 2)
+abline(v = 0.3, col = 'red')
+
+
+
+
+
+#For results in Tables 5.2 please run the following, replacing the [,i] ith index to change parameter
+#and attain minimum, then also please swap ESS and ESJD to attain the rest of those values. 
+#To attain acceptance probabilities and computation time, as shown in code for Gibbs and PMMH LV code, are contatined 
+#in list elements [[2]] and [[3]] respectively
+
+ESJD(Gibbs_results_tune4[[1]][100:10000,3])
+ESJD(Gibbs_results_tune2[[1]][100:10000,3])
+ESJD(Gibbs_results_tune5[[1]][100:10000,3])
+
+ESS(PMMH_results_tune17[[1]][4500:10000,2])
+ESS(PMMH_results_tune12[[1]][5400:10000,2])
+ESS(PMMH_results_tune15[[1]][1800:10000,2])
+
+#
