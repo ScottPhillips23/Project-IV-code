@@ -194,4 +194,19 @@ plot(density(Gibbs_results_tune3[[1]][100:10000,3], adjust = 3), main = '', xlab
 lines(density(PMMH_results_tune13[[1]][8100:10000,3], adjust = 3), lty = 2)
 abline(v = 0.3, col = 'red')
 
-#If you want to generate data for Table 5.1
+
+
+
+
+#For results in Tables 5.1 please run the following, replacing the [,i] ith index to change parameter
+#and attain minimum, then also please swap ESS and ESJD to attain the rest of those values. 
+#To attain acceptance probabilities and computation time, as shown in code for Gibbs and PMMH LV code, are contatined 
+#in list elements [[2]] and [[3]] respectively
+
+ESJD(Gibbs_results_tune1[[1]][100:10000,3])
+ESJD(Gibbs_results_tune2[[1]][100:10000,3])
+ESJD(Gibbs_results_tune3[[1]][100:10000,3])
+
+ESS(PMMH_results_tune11[[1]][4500:10000,2])
+ESS(PMMH_results_tune12[[1]][5400:10000,2])
+ESS(PMMH_results_tune13[[1]][8100:10000,2])
