@@ -1,0 +1,287 @@
+install.packages('matrixStats')
+library(matrixStats)
+library(ggplot2)
+library(MASS) 
+library(dplyr) 
+library(tidyr)  
+
+#Functions to generate Analytic(Gillespie) and Numerical(Diffusion Approximation)
+
+alpha <- function(x, theta) {
+  c(theta[1] * x[1] - theta[2] * x[1] * x[2], 
+    theta[2] * x[1] * x[2] - theta[3] * x[2])
+}
+
+beta <- function(x, theta) {
+  diag(c(sqrt(abs(theta[1] * x[1] + theta[2] * x[1] * x[2])),
+         sqrt(abs(theta[2] * x[1] * x[2] + theta[3] * x[2]))))
+}
+
+LVsimEM <- function(theta, x, T, dt) {
+  iters <- T / dt
+  xmat <- matrix(data = NA, ncol = 2, nrow = iters)
+  xmat[1, ] <- x
+  for (i in 2:iters) {
+    x <- mvrnorm(1, x + alpha(x, theta) * dt, beta(x, theta) * dt)
+    x[x < 0.001] <- 0.001  
+    xmat[i, ] <- x
+  }
+  return(xmat)
+}
+
+LV_Gillespie <- function(theta, x0, Tmax) {
+  time <- 0
+  pred_time <- c(0)
+  prey_time <- c(0)
+  prey <- x0[1]
+  predator <- x0[2]
+  prey_pop <- c(x0[1])
+  pred_pop <- c(x0[2])
+  time_tot <- c(0)
+  results <- data.frame(time = time, prey = prey, predator = predator)
+  while (time < Tmax) {
+    birth_prey <- theta[1] * prey
+    predation <- theta[2] * prey * predator
+    death_pred <- theta[3] * predator
+    rates <- c(birth_prey, predation, death_pred)
+    total_rate <- sum(rates)
+    
+    if (total_rate == 0) break
+    
+    dt <- rexp(1, total_rate)
+    time <- time + dt
+    
+    event <- sample(1:3, size = 1, prob = rates / total_rate)
+    
+    if (event == 1) {
+      prey <- prey + 1
+      prey_time <- rbind(prey_time, time)
+      prey_pop <- rbind(prey_pop, prey)
+    } else if (event == 2) {
+      prey <- max(prey - 1, 0)
+      predator <- predator + 1
+      pred_time <- rbind(pred_time, time)
+      prey_time <- rbind(prey_time, time)
+      prey_pop <- rbind(prey_pop, prey)
+      pred_pop <- rbind(pred_pop, predator)
+    } else {
+      predator <- max(predator - 1, 0)
+      pred_time <- rbind(pred_time, time)
+      pred_pop <- rbind(pred_pop, predator)
+    }
+  }
+  
+  return(list(pred_pop, prey_pop, pred_time, prey_time))
+}
+
+#Create Gillespie data
+
+set.seed(101)
+Gillespie_out_base <- LV_Gillespie(c(0.5, 0.0025, 0.3), c(50, 50), 50)
+
+Gillespie_pred <- matrix(data = NA, nrow = 20000, ncol = 500)
+
+Gillespie_prey <- matrix(data = NA, nrow = 20000, ncol = 500)
+
+Gillespie_pred_time <- matrix(data = NA, nrow = 20000, ncol = 500)
+
+Gillespie_prey_time <- matrix(data = NA, nrow = 20000, ncol = 500)
+
+for(i in 1:500){
+  start_time_gillespie <- Sys.time()
+  set.seed(i+6)
+  Gillespie_out <- LV_Gillespie(c(0.5, 0.0025, 0.3), c(50, 50), 40)
+  Gillespie_pred[,i] <- Gillespie_out[[1]][1:20000]
+  Gillespie_prey[,i] <- Gillespie_out[[2]][1:20000]
+  Gillespie_pred_time[,i] <- Gillespie_out[[3]][1:20000]
+  Gillespie_prey_time[,i] <- Gillespie_out[[4]][1:20000]
+  print(i)
+  end_time_gillespie <- Sys.time()
+  final_time <- end_time_gillespie - start_time_gillespie
+}
+
+Gillespie_pred_mean_pop <- rowMeans(Gillespie_pred)
+Gillespie_pred_mean_time <- rowMeans(Gillespie_pred_time)
+Gillespie_prey_mean_pop <- rowMeans(Gillespie_prey)
+Gillespie_prey_mean_time <- rowMeans(Gillespie_prey_time)
+
+Gillespie_pred_var_pop <- rowVars(Gillespie_pred)
+Gillespie_pred_var_time <- rowVars(Gillespie_pred_time)
+Gillespie_prey_var_pop <- rowVars(Gillespie_prey)
+Gillespie_prey_var_time <- rowVars(Gillespie_prey_time)
+
+#Now producing Diffusion Approximation Code
+
+Lotka_Volterra_base <- LVsimEM(c(0.5, 0.0025, 0.3), c(50, 50), 14, 0.01)
+Lotka_Volterra_base
+
+LV_pred <- matrix(data = NA, nrow = 1400, ncol = 500)
+LV_prey <- matrix(data = NA, nrow = 1400, ncol = 500)
+LV_time <- matrix(data = NA, nrow = 1400, ncol = 1)
+
+for(i in 1:500){
+  start_time_LV <- Sys.time()
+  set.seed(i+6)
+  LV_out <- LVsimEM(c(0.5, 0.0025, 0.3), c(50, 50), 14, 0.01)
+  LV_time <- seq(0.01, 14, 0.01)
+  LV_pred[,i] <- LV_out[,2]
+  LV_prey[,i] <- LV_out[,1]
+  print(i)
+  end_time_LV <- Sys.time()
+  final_time_LV <- end_time_LV - start_time_LV
+}
+
+LV_pred_mean <- rowMeans(LV_pred)
+LV_prey_mean <- rowMeans(LV_prey)
+
+LV_pred_vars <- rowVars(LV_pred)
+LV_prey_vars <- rowVars(LV_prey)
+
+LV_pred_mean <- as.matrix(LV_pred_mean)
+LV_time <- as.matrix(LV_time)
+
+#Produce Figure 4.2
+
+par(mfrow = c(2,2))
+
+plot(y = LV_pred_mean, x = LV_time, type = 'l', ylab = 'Population', xlab = 'Time',
+     main = 'Diffusion Approximation Predator', xlim = c(0, 12), ylim = c(0, 700))
+lines(y = LV_pred_mean + 1.96*sqrt(LV_pred_vars), x = LV_time, lty = 2, col = 'red')
+lines(y = LV_pred_mean - 1.96*sqrt(LV_pred_vars), x = LV_time, lty = 2, col = 'red')
+
+plot(y = LV_prey_mean, x = LV_time, type = 'l', ylab = '', xlab = 'Time',
+     main = 'Diffusion Approximation Prey', xlim = c(0,12))
+lines(y = LV_prey_mean + 1.96*sqrt(LV_prey_vars), x = LV_time, lty = 2, col = 'red')
+lines(y = LV_prey_mean - 1.96*sqrt(LV_prey_vars), x = LV_time, lty = 2, col = 'red')
+
+plot(y = Gillespie_pred_mean_pop, x = Gillespie_pred_mean_time, type = 'l', 
+     xlim = c(0, 12), ylim = c(0, 700), ylab = 'Population', xlab = '',
+     main = 'Gillespie Predator')
+lines(y = Gillespie_pred_mean_pop + 1.96*sqrt(Gillespie_pred_var_pop), 
+      x = Gillespie_pred_mean_time, lty = 2, col = 'red')
+lines(y = Gillespie_pred_mean_pop - 1.96*sqrt(Gillespie_pred_var_pop), 
+      x = Gillespie_pred_mean_time, lty = 2, col = 'red')
+
+plot(y = Gillespie_prey_mean_pop, x = Gillespie_prey_mean_time, type = 'l',
+     xlim = c(0, 12), ylab = '', xlab = '',
+     main = 'Gillespie Prey')
+lines(y = Gillespie_prey_mean_pop + 1.96*sqrt(Gillespie_prey_var_pop), 
+      x = Gillespie_prey_mean_time, lty = 2, col = 'red')
+lines(y = Gillespie_prey_mean_pop - 1.96*sqrt(Gillespie_prey_var_pop), 
+      x = Gillespie_prey_mean_time, lty = 2, col = 'red')
+
+
+
+#Now creating Figure 4.1
+
+
+
+library(deSolve)
+library(MASS)
+library(ggplot2)
+
+# Define ODE system for Lotka-Volterra
+LV_ode <- function(t, state, parameters) {
+  x <- state[1]  # Prey
+  y <- state[2]  # Predator
+  with(as.list(parameters), {
+    dx <- birth_prey * x - predation * x * y
+    dy <- predation * x * y - death_pred * y
+    list(c(dx, dy))
+  })
+}
+
+# Set rate parameters
+params <- c(birth_prey = 0.5, predation = 0.0025, death_pred = 0.3)
+
+# Initial conditions (Starting at 50 for both prey and predator)
+x0 <- c(50, 50)
+time_seq <- seq(0, 50, by = 0.1)  # Time points
+
+# Solve ODE
+ode_solution <- ode(y = x0, times = time_seq, func = LV_ode, parms = params)
+ode_df <- as.data.frame(ode_solution)
+colnames(ode_df) <- c("time", "prey", "predator")
+
+# Define stochastic simulation function (Euler-Maruyama method)
+alpha <- function(x, theta) {
+  c(theta[1] * x[1] - theta[2] * x[1] * x[2], 
+    theta[2] * x[1] * x[2] - theta[3] * x[2])
+}
+
+beta <- function(x, theta) {
+  mat <- matrix(0, ncol = 2, nrow = 2, byrow = TRUE)
+  mat[1,1] <- theta[1] * x[1] + theta[2] * x[1] * x[2]
+  mat[1,2] <- -theta[2] * x[1] * x[2]
+  mat[2,1] <- mat[1,2]
+  mat[2,2] <- theta[2] * x[1] * x[2] + theta[3] * x[2]
+  return(mat)
+}
+
+LVsimEM <- function(theta, x, T, dt){
+  iters <- T / dt
+  time_vals <- seq(0, T, by = dt)
+  xmat <- matrix(data = NA, ncol = 3, nrow = iters)
+  xmat[1,] <- c(time_vals[1], x)
+  for(i in 2:iters){
+    x <- mvrnorm(1, x + alpha(x, theta) * dt, beta(x, theta) * dt)
+    x[x < 0.001] <- 0.001  # Prevent negative values
+    xmat[i,] <- c(time_vals[i], x)
+  }
+  return(as.data.frame(xmat))
+}
+
+# Run stochastic simulations
+set.seed(41)  # For reproducibility
+theta <- c(0.5, 0.0025, 0.3)
+dt <- 0.01  # Smaller time step for higher accuracy
+Tmax <- 50
+n_simulations <- 3
+
+simulations <- lapply(1:n_simulations, function(i) {
+  sim <- LVsimEM(theta, x0, Tmax, dt)
+  colnames(sim) <- c("time", "prey", "predator")
+  sim$sim_id <- i  # Assign simulation ID
+  return(sim)
+})
+
+# Convert to data frame
+sim_df <- do.call(rbind, simulations)
+
+# Set y-axis limits based on reasonable fluctuation
+ylim_range <- c(0, max(ode_df$prey, ode_df$predator, sim_df$prey, sim_df$predator))
+
+# Plot Prey Population
+p1 <- ggplot() +
+  geom_line(data = ode_df, aes(x = time, y = prey), color = "black", size = 1) +  # ODE solution
+  geom_line(data = sim_df, aes(x = time, y = prey, group = sim_id), 
+            color = "blue", size = 0.5, alpha = 0.8) +  # Stochastic simulations (same color)
+  labs(title = "Prey Population Over Time", x = "Time", y = "Prey Population") +
+  ylim(ylim_range) +
+  theme_minimal()
+
+# Plot Predator Population
+p2 <- ggplot() +
+  geom_line(data = ode_df, aes(x = time, y = predator), color = "black", size = 1) +  # ODE solution
+  geom_line(data = sim_df, aes(x = time, y = predator, group = sim_id), 
+            color = "red", size = 0.5, alpha = 0.8) +  # Stochastic simulations (same color)
+  labs(title = "Predator Population Over Time", x = "Time", y = "Predator Population") +
+  ylim(ylim_range) +
+  theme_minimal()
+
+print(p1)
+print(p2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
