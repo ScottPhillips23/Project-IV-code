@@ -1,0 +1,230 @@
+#Generate Synthetic Data
+
+set.seed(3)
+out1 <- GBsimEM(0.5, 0.3, 50, 10, 0.0001)
+plot(ts(out1, deltat = 0.0001))
+out4 <- out1[1]
+for(i in 2:100){
+  out4 <- rbind(out4, out1[i*1000])
+}
+out4 <- as.matrix(out4)
+
+
+
+
+#GBM runs for Figure 3.2, 3.3. and 3.4
+
+set.seed(3)
+
+GBM_results_initial_burnin1 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01,
+                                    30, 1000, matrix(c(0.01, 0, 0, 0.01), nrow = 2))
+
+GBM_tune_burnin1 <- var(GBM_results_initial_burnin1[[1]][100:1000,])
+
+set.seed(3)
+
+GBM_results_tune_burnin1 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01, 30, 10000, 
+                                 GBM_tune_burnin1*(2.38^2)/2)
+
+
+
+
+#Code to Produce Figure 3.2
+
+tsplot(GBM_results_initial_burnin1[[1]][100:1000,], xlab = 'iters', ylab = c(expression(theta[1]), expression(theta[2])))
+plot(density(GBM_results_initial_burnin1[[1]][100:1000,1]), main = '', xlab ='Value', ylab = '')
+abline(v = 0.5, col = 'red')
+plot(density(GBM_results_initial_burnin1[[1]][100:1000,2]), main = '', xlab ='Value', ylab = '')
+abline(v = 0.3, col = 'red')
+
+acf(GBM_results_initial_burnin1[[1]][100:1000,1])
+acf(GBM_results_initial_burnin1[[1]][100:1000,2])
+
+
+
+
+#Code to produce Figure 3.3
+
+tsplot(GBM_results_tune_burnin1[[1]][100:10000,], xlab = 'iters', ylab = c(expression(theta[1]), expression(theta[2])))
+plot(density(GBM_results_tune_burnin1[[1]][100:10000,1]), main = '', xlab ='Value', ylab = '')
+abline(v = 0.5, col = 'red')
+plot(density(GBM_results_tune_burnin1[[1]][100:10000,2]), main = '', xlab ='Value', ylab = '')
+abline(v = 0.3, col = 'red')
+
+acf(GBM_results_tune_burnin1[[1]][100:10000,1])
+acf(GBM_results_tune_burnin1[[1]][100:10000,2])
+
+
+
+
+#Code to produce Figure 3.4
+
+tsplot(GBM_results_tune_burnin1[[1]], xlab = 'iters', ylab = c(expression(theta[1]), expression(theta[2])))
+plot(density(GBM_results_tune_burnin1[[1]][,1]), main = '', xlab ='Value', ylab = '')
+abline(v = 0.5, col = 'red')
+plot(density(GBM_results_tune_burnin1[[1]][,2]), main = '', xlab ='Value', ylab = '')
+abline(v = 0.3, col = 'red')
+
+acf(GBM_results_tune_burnin1[[1]][,1])
+acf(GBM_results_tune_burnin1[[1]][,2])
+
+
+
+
+
+#Code to Produce Table 3.2
+
+#Number of Bridges runs
+
+
+
+#Run for 1 bridge
+
+set.seed(3)
+
+GBM_results_initial_bridges1 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01,
+                                           1, 1000, matrix(c(0.01, 0, 0, 0.01), nrow = 2))
+
+GBM_tune_bridges1 <- var(GBM_results_initial_bridges1[[1]][100:1000,])
+
+set.seed(3)
+
+GBM_results_tune_bridges1 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01, 1, 10000, 
+                                 GBM_tune_bridges1*(2.38^2)/2)
+
+
+
+#Run for 5 bridges
+
+set.seed(3)
+
+GBM_results_initial_bridges2 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01,
+                                            5, 1000, matrix(c(0.01, 0, 0, 0.01), nrow = 2))
+
+GBM_tune_bridges2 <- var(GBM_results_initial_bridges2[[1]][100:1000,])
+
+set.seed(3)
+
+GBM_results_tune_bridges2 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01, 5, 10000, 
+                                         GBM_tune_bridges2*(2.38^2)/2)
+
+
+
+
+#Code for 30 Runs
+
+set.seed(3)
+
+GBM_results_initial_bridges3 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01,
+                                            30, 1000, matrix(c(0.01, 0, 0, 0.01), nrow = 2))
+
+GBM_tune_bridges3 <- var(GBM_results_initial_bridges3[[1]][100:1000,])
+
+set.seed(3)
+
+GBM_results_tune_bridges3 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01, 30, 10000, 
+                                         GBM_tune_bridges3*(2.38^2)/2)
+
+
+
+
+#Code for 90 runs
+
+set.seed(3)
+
+GBM_results_initial_bridges4 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01,
+                                            90, 1000, matrix(c(0.01, 0, 0, 0.01), nrow = 2))
+
+GBM_tune_bridges4 <- var(GBM_results_initial_bridges4[[1]][100:1000,])
+
+set.seed(3)
+
+GBM_results_tune_bridges4 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01, 90, 10000, 
+                                         GBM_tune_bridges4*(2.38^2)/2)
+
+
+
+
+
+
+
+#Partition Size 
+
+
+
+#Code for 2 partition size
+
+set.seed(3)
+
+GBM_results_initial_part1 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.05,
+                                            30, 1000, matrix(c(0.01, 0, 0, 0.01), nrow = 2))
+
+GBM_tune_part1 <- var(GBM_results_initial_part1[[1]][100:1000,])
+
+set.seed(3)
+
+GBM_results_tune_part1 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.05, 30, 10000, 
+                                         GBM_tune_part1*(2.38^2)/2)
+
+
+
+
+#Code for 10 partition size 
+
+set.seed(3)
+
+GBM_results_initial_part2 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01,
+                                         30, 1000, matrix(c(0.01, 0, 0, 0.01), nrow = 2))
+
+GBM_tune_part2 <- var(GBM_results_initial_part2[[1]][100:1000,])
+
+set.seed(3)
+
+GBM_results_tune_part2 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.01, 30, 10000, 
+                                      GBM_tune_part2*(2.38^2)/2)
+
+
+
+
+#Code for 50 partition size 
+
+set.seed(3)
+
+GBM_results_initial_part3 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.002,
+                                         30, 1000, matrix(c(0.01, 0, 0, 0.01), nrow = 2))
+
+GBM_tune_part3 <- var(GBM_results_initial_part3[[1]][100:1000,])
+
+set.seed(3)
+
+GBM_results_tune_part3 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.002, 30, 10000, 
+                                      GBM_tune_part3*(2.38^2)/2)
+
+
+
+
+#Code for 100 partiton size 
+
+set.seed(3)
+
+GBM_results_initial_part4 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.001,
+                                         30, 1000, matrix(c(0.01, 0, 0, 0.01), nrow = 2))
+
+GBM_tune_part4 <- var(GBM_results_initial_part4[[1]][100:1000,])
+
+set.seed(3)
+
+GBM_results_tune_part4 <- PMMH_bridge(c(2, 0.8), out4, 0.1, 0.001, 30, 10000, 
+                                      GBM_tune_part4*(2.38^2)/2)
+
+
+
+
+#Now to produce output from runs all that needs to be done is calculate the ESS and ESJD using the ESS() function 
+#and the following ESJD function. Now all that remains to be shown is the acceptance probability and compuatation time
+#with can be found in list components [[2]] and [[3]]
+
+ESJD <- function(trace) {
+  diffs <- diff(trace)
+  sum(diffs^2) / length(diffs)
+}
