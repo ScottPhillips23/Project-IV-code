@@ -1,0 +1,142 @@
+library('MVN')
+library('MASS')
+library(mvtnorm)
+library(mvnfast)
+library(Matrix)
+
+alpha <- function(x,theta){
+  c(theta[1]*x[1]-theta[2]*x[1]*x[2],theta[2]*x[1]*x[2]-theta[3]*x[2])
+}
+
+beta <- function(x,theta){
+  mat=matrix(0,ncol=2,nrow=2,byrow=T)
+  mat[1,1]=theta[1]*x[1]+theta[2]*x[1]*x[2]
+  mat[1,2]=-theta[2]*x[1]*x[2]
+  mat[2,1]=mat[1,2]
+  mat[2,2]=theta[2]*x[1]*x[2]+theta[3]*x[2]
+  return(mat)
+}
+
+LVsimEM <- function(theta, x, T, dt){
+  iters <- T/dt
+  xmat <- matrix(data = NA, ncol = 2, nrow = iters)
+  xmat[1,] <- x
+  for(i in 2:iters){
+    x <- mvrnorm(1, x + alpha(x, theta)*dt, beta(x, theta) * dt)
+    if(x[1]<0.001){x[1]=0.001}
+    if(x[2]<0.001){x[2]=0.001}
+    xmat[i,] <- x
+  }
+  return(xmat)
+}
+
+DGBmulti <- function(x0, xT, theta, T, dt){
+  N <- T/dt +1
+  sim <- matrix(data = NA, nrow = N, ncol = 2)
+  sim[1,] <- x0
+  sim[N,] <- xT
+  for(i in 1:(N-2)){
+    xt <- sim[i,]
+    mean_bridge <- xt + dt * (xT - xt)/(T - (i-1)*dt)
+    var_bridge <- beta(xt,theta) * (dt *(T - (i) * dt)/(T - (i-1)*dt))
+    sim[i+1,] <- mvrnorm(1, mu = mean_bridge, Sigma = var_bridge)
+    if(sim[i+1,1] < 0){
+      sim[i+1,1] <- 0.01
+    }
+    if(sim[i+1,2] < 0){
+      sim[i+1,2] <- 0.01
+    }
+  }
+  return(sim)
+}
+
+demlik <- function(theta, T, dt, data){
+  N <- nrow(data)
+  llike <- 0
+  xT <- data[N,]
+  for(i in 1:(N-2)){
+    xt <- data[i,]
+    llike <- llike+dmvnorm(data[i+1,], 
+                           mean = xt + dt * (xT - xt) / (T - ((i-1) * dt)),
+                           sigma = beta(xt, theta) * dt * (T - (i) * dt) / (T - ((i-1) * dt)),
+                           log = TRUE)
+  }
+  return(llike)
+}
+
+numlik <- function(theta, dt, data){
+  N <- nrow(data)
+  llike <- 0
+  for(i in 1:(N-1)){
+    xt <- data[i,]
+    llike <- llike + dmvnorm(data[i+1,], mean = alpha(xt, theta)*dt + xt, 
+                            sigma = beta(xt,theta) * dt, log = TRUE)
+  }
+  return(llike)
+}
+
+resampling <- function(theta, x0, xT, T, dt, bridges){
+  N <- T/dt
+  weights <- numeric(bridges)
+  for(i in 1:bridges){
+    sim1 <- DGBmulti(x0, xT, theta, T, dt)
+    num <- numlik(theta, dt, sim1)
+    dem <- demlik(theta, T, dt, sim1)
+    weights[i] <- num - dem 
+  }
+  lphat <- (mean(weights)) 
+  return(lphat)
+}
+
+lprior <- function(param){
+  mu <- c(0.5, 0.0025, 0.3)
+  sigma <- Diagonal(length(param), c(0.5, 0.5, 0.5))
+  lp <- sum(dmvn(param, mu, sigma, log = TRUE))
+  return(lp)
+}
+
+llike <- function(theta, X, T, dt, bridges){
+  N <- nrow(X)
+  like <- 0
+  for(i in 1:(N-1)){
+    like <- like + resampling(theta, X[i,], X[i+1,], T, dt, bridges)
+  }
+  return(like)
+}
+
+PMMH_bridge_multi <- function(theta, X, T, dt, bridges, iters, theta_sd){
+  start <- Sys.time()
+  count <- 0
+  theta_samples <- matrix(nrow = iters+1, ncol = length(theta))
+  theta_samples[1,] <- theta
+  current_loglik <- llike(theta, X, T, dt, bridges)
+  for(i in 1:(iters)){
+    print(sprintf("%d / %d", i, iters))
+    phi <- theta_samples[i, ]
+    can <- rmvn(1, theta_samples[i, ], theta_sd)
+    if(can[,1] <= 0.00001){
+      theta_samples[i+1,] <- theta_samples[i,]
+      next
+    }
+    if(can[,2] <= 0.00001){
+      theta_samples[i+1,] <- theta_samples[i,]
+      next
+    }
+    if(can[,3] <= 0.00001){
+      theta_samples[i+1,] <- theta_samples[i,]
+      next
+    }
+    proposed_loglik <- llike(can, X, T, dt, bridges)
+    laprob <- proposed_loglik - current_loglik + lprior(can) - lprior(theta_samples[i,])
+    if( log(runif(1)) < laprob){
+      phi <- can
+      current_loglik <- proposed_loglik
+      count <- count + 1
+    }
+    theta_samples[i+1,] <- phi
+  }
+  print(count/nrow(theta_samples))
+  end <- Sys.time()
+  time <- end-start
+  return(list(theta_samples, count/nrow(theta_samples), time))
+}
