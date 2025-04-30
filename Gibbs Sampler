@@ -1,0 +1,185 @@
+library('MVN')
+library('MASS')
+library(mvtnorm)
+library(mvnfast)
+library(Matrix)
+
+alpha <- function(x,theta){
+  c(theta[1]*x[1]-theta[2]*x[1]*x[2],theta[2]*x[1]*x[2]-theta[3]*x[2])
+}
+
+beta <- function(x,theta){
+  mat=matrix(0,ncol=2,nrow=2,byrow=T)
+  mat[1,1]=theta[1]*x[1]+theta[2]*x[1]*x[2]
+  mat[1,2]=-theta[2]*x[1]*x[2]
+  mat[2,1]=mat[1,2]
+  mat[2,2]=theta[2]*x[1]*x[2]+theta[3]*x[2]
+  return(mat)
+}
+
+LVsimEM <- function(theta, x, T, dt){
+  iters <- T/dt
+  xmat <- matrix(data = NA, ncol = 2, nrow = iters)
+  xmat[1,] <- x
+  for(i in 2:iters){
+    x <- mvrnorm(1, x + alpha(x, theta)*dt, beta(x, theta) * dt)
+    if(x[1]<0.001){x[1]=0.001}
+    if(x[2]<0.001){x[2]=0.001}
+    xmat[i,] <- x
+  }
+  return(xmat)
+}
+
+DGBmulti <- function(x0, xT, theta, T, dt){
+  N <- T/dt +1
+  sim <- matrix(data = NA, nrow = N, ncol = 2)
+  sim[1,] <- x0
+  sim[N,] <- xT
+  for(i in 1:(N-2)){
+    x <- as.numeric(i)
+    y <- as.numeric(i-1)
+    xt <- sim[i,]
+    mean_bridge <- xt + dt * (xT - xt)/(T - y*dt)
+    var_bridge <- beta(xt,theta) * (dt *(T - x * dt)/(T - y*dt))
+    sim[i+1,] <- mvrnorm(1, mu = mean_bridge, Sigma = var_bridge)
+    if(sim[i+1,1] < 0){
+      sim[i+1,1] <- 0.01
+    }
+    if(sim[i+1,2] < 0){
+      sim[i+1,2] <- 0.01
+    }
+  }
+  #print(sim)
+  return(sim)
+}
+
+initial_path <- function(theta0, obs_data, T, dt){
+  N <- nrow(obs_data)
+  M <- T/dt+1
+  x1 <- matrix(data = NA, nrow = M, ncol = N-1)
+  x2 <- matrix(data = NA, nrow = M, ncol = N-1)
+  for(i in 1:(N-1)){
+    #print(obs_data[i+1,])
+    sim <- DGBmulti(obs_data[i,], obs_data[i+1,], theta0, T, dt)
+    x1[,i] <- sim[,1]
+    x2[,i] <- sim[,2]
+  }
+  return(list(x1, x2))
+}
+
+lprior <- function(param){
+  mu <- c(0.5, 0.0025, 0.3)
+  sigma <- Diagonal(length(param), c(0.5, 0.5, 0.5))
+  lp <- sum(dmvn(param, mu, sigma, log = TRUE))
+  return(lp)
+}
+
+theta_accept <- function(data, theta, dt){
+  M <- nrow(data[[1]])
+  N <- ncol(data[[2]])
+  data1 <- data[[1]]
+  data2 <- data[[2]]
+  llike <- 0
+  for(i in 1:(N)){
+    for(j in 2:(M)){
+      xt <- c(data1[j-1,i], data2[j-1,i])
+      xu <- c(data1[j,i], data2[j,i]) 
+      llike <- llike + dmvnorm(xu, mean = alpha(xt, theta)*dt + xt, 
+                               sigma = beta(xt,theta) * dt, log = TRUE)
+    }
+  }
+  lp <- lprior(theta)
+  return(lp + llike)
+}
+
+theta_MH <- function(data, theta, theta_sd, T, dt){
+  thetastar <- rmvnorm(1, mean = theta, theta_sd)
+  laprob <- theta_accept(data, thetastar, dt)- theta_accept(data, theta, dt)
+  if(log(runif(1)) < laprob){
+    theta <- thetastar
+  }
+  return(theta)
+}
+
+xu_SDE <- function(xustar1, xustar2, xu1, xu2, theta, dt, i, M){
+  llike <- 0
+  for(j in 2:M){
+    xt <- c(xustar1[j-1,i], xustar2[j-1,i])
+    xu <- c(xustar1[j,i], xustar2[j,i])
+    num <- dmvnorm(xu, mean = alpha(xt, theta)*dt + xt, 
+                   sigma = beta(xt,theta) * dt, log = TRUE)
+    xt <- c(xu1[j-1,i], xu2[j-1,i])
+    xu <- c(xu1[j,i], xu2[j,i])
+    dem <- dmvnorm(xu, mean = alpha(xt, theta)*dt + xt, 
+                   sigma = beta(xt,theta) * dt, log = TRUE)
+    llike <- llike + num-dem
+  }
+  return(llike)
+}
+
+xu_bridge <- function(xustar1, xustar2, xu1, xu2, theta, T, dt, i, M){
+  llike <- 0
+  for(j in 2:(M-1)){
+    xT <- c(xu1[M,i], xu2[M,i])
+    xt <- c(xu1[j-1,i], xu2[j-1,i])
+    xu <- c(xu1[j,i], xu2[j,i])
+    num <- dmvnorm(xu, 
+                   mean = xt + dt * (xT - xt) / (T - (i-1) * dt),
+                   sigma = beta(xt, theta) *(dt * (T - i * dt) / (T - (i-1) * dt)),
+                   log = TRUE)
+    xT <- c(xustar1[M,i], xustar2[M,i])
+    xt <- c(xustar1[j-1,i], xustar2[j-1,i])
+    xu <- c(xustar1[j,i], xustar2[j,i])
+    dem <- dmvnorm(xu, 
+                   mean = xt + dt * (xT - xt) / (T - (i-1) * dt),
+                   sigma = beta(xt, theta) *(dt * (T - i * dt) / (T - (i-1) * dt)),
+                   log = TRUE)
+    llike <- llike + num - dem
+  }
+  return(llike)
+}
+
+xu_accept <- function(data, datastar, theta, T, dt){
+  M <- nrow(data[[1]])
+  N <- ncol(data[[1]])
+  xustar1 <- datastar[[1]]
+  xustar2 <- datastar[[2]]
+  xu1 <- data[[1]]
+  xu2 <- data[[2]]
+  llike <- 0
+  for(i in 1:N){
+    llike <- xu_SDE(xustar1, xustar2, xu1, xu2, theta, dt, i, M) + 
+      xu_bridge(xustar1, xustar2, xu1, xu2, theta, T, dt, i, M)
+  }
+  return(llike)
+}
+
+xu_MH <- function(obs_data, data, theta, T, dt){
+  N <- nrow(obs_data)
+  M <- T/dt+1
+  xustar1 <- matrix(data = NA, nrow = M, ncol = N)
+  xustar2 <- matrix(data = NA, nrow = M, ncol = N)
+  datastar <- initial_path(theta, obs_data, T, dt)
+  laprob <- xu_accept(data, datastar, theta, T, dt)
+  if(log(runif(1)) < laprob){
+    xustar1 <- datastar[[1]]
+    xustar2 <- datastar[[2]]
+  }
+  else{
+    xustar1 <- data[[1]]
+    xustar2 <- data[[2]]
+  }
+  return(list(xustar1, xustar2))
+}
+
+Gibbs <- function(obs_data, theta0, theta_sd, T, dt, iters){
+  data <- initial_path(theta0, obs_data, T, dt)
+  theta <- matrix(data = NA, nrow = iters+1, ncol = length(theta0))
+  theta[1,] <- theta0
+  for(i in 2:(iters+1)){
+    theta[i,] <- theta_MH(data, theta[i-1,], theta_sd, T, dt)
+    data <- xu_MH(obs_data, data, theta[i,], T, dt)
+    print(i)
+  }
+  return(theta)
+}
