@@ -1,0 +1,149 @@
+# Function required to make rest of code run
+
+BMsim <- function(x0, t, iters){
+  vec <- numeric(iters)
+  vec[1] <- sqrt(x0)
+  dt <- t/iters
+  time <- seq(0, t, length.out = iters)
+  for(i in 2:iters){
+    xt <- rnorm(1, 0, 1)
+    vec[i]<- vec[i-1] + sqrt(dt) * xt
+  }
+  return(list(vec, time))
+}
+
+GBMsim <- function(mu, sigma, x0, t, iters){
+  dt <- t/iters
+  vec <- numeric(iters)
+  vec[1] <- x0
+  for(i in  2:iters){
+    xs <- vec[i-1]
+    xt <- rlnorm(1, (log(xs) + (mu-sigma^2/2)*dt), sigma*sqrt(dt))
+    #xy <- rnorm(1, 0, sqrt(dt))
+    #xt <- xs * exp((mu-0.5*sigma^2)*dt + sigma*xy)
+    vec[i] <- xt
+  }
+  return(vec)
+}
+
+
+GBMsimEM <- function(mu, sigma, x0, t, iters){
+  dt <- t/iters
+  vec <- numeric(iters)
+  vec[1] <- x0
+  for(i in  2:iters){
+    xs <- vec[i-1]
+    xt <-  rnorm(1, xs + mu*xs*dt, sqrt(sigma^2*xs^2*dt))
+    if(xt <= 0.0001){
+      xt <- 0.0001
+    }
+    vec[i] <- xt
+  }
+  return(vec)
+}
+
+
+
+
+# Code for Figure 2.1
+
+plot_GBM_and_ODE <- function(mu, sigma, x0, t, iters, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)  # Set seed for reproducibility
+  
+  dt <- t / iters
+  time <- seq(0, t, length.out = iters + 1)  # Time points
+  
+  # Initialize GBM
+  GBM <- numeric(iters + 1)
+  GBM[1] <- x0
+  
+  # Simulate GBM
+  for (i in 2:(iters + 1)) {
+    GBM[i] <- GBM[i - 1] * exp((mu - 0.5 * sigma^2) * dt + sigma * sqrt(dt) * rnorm(1))
+  }
+  
+  # Compute ODE trajectory (deterministic solution)
+  ODE <- x0 * exp(mu * time)
+  
+  # Plot GBM and ODE
+  plot(
+    time, GBM, type = "l", col = "blue", lwd = 2,
+    ylim = range(c(GBM, ODE)), main = "Geometric Brownian Motion vs ODE",
+    xlab = "Time", ylab = expression(W[t]), las = 1
+  )
+  lines(time, ODE, col = "red", lwd = 2, lty = 2)
+  
+  # Add legend
+  legend(
+    "topleft", legend = c("GBM (stochastic)", "ODE (deterministic)"),
+    col = c("blue", "red"), lwd = 2, lty = c(1, 2)
+  )
+}
+
+# Example usage:
+plot_GBM_and_ODE(mu = 0.05, sigma = 0.2, x0 = 1, t = 25, iters = 1000, seed = 5)
+
+
+
+
+
+# Code for Figure 2.2
+
+par(mfrow = c(1,1))
+
+set.seed(6)
+sims <- BMsim(0, 9, 1000)
+sims[[1]]
+plot(ts(sims[[1]], deltat = 0.01, start = 0), ylim = c(-4, 8), main = 'Brownian Motion', 
+     ylab = expression(W[t]), xlab = 'time', xlim = c(0, 10), cex.main = 0.75)
+for(i in 1:2){
+  set.seed(i+1)
+  sims <- BMsim(0, 9, 1000)
+  lines(ts(sims[[1]], deltat = 0.01, start = 0))
+}
+
+
+
+
+# Code for Figure 2.3
+
+plotanalytic <- function(mu, sigma, x0, t, iters, lines, seed){
+  set.seed(seed)
+  sim <- GBMsim(mu[1], sigma[1], x0, t, iters)
+  plot(ts(sim, deltat = t/iters), main = 'Geometric Brownian Motion', ylim = c(0,10),
+       ylab = 'X(w, x(t))', col = 'black')
+  for(i in 1:lines){
+    set.seed(i+seed+4)
+    sim1 <- GBMsim(mu[1], sigma[1], x0, t, iters)
+    lines(ts(sim1, deltat = t/iters), col = 'black')
+    sim2 <- GBMsim(mu[1], sigma[2], x0, t, iters)
+    lines(ts(sim2, deltat = t/iters), col = 'red')
+    sim3 <- GBMsim(mu[2], sigma[1], x0, t, iters)
+    lines(ts(sim3, deltat = t/iters), col = 'blue')
+    sim4 <- GBMsim(mu[2], sigma[2], x0, t, iters)
+    lines(ts(sim4, deltat = t/iters), col = 'orange')
+}
+}
+
+plotEM <- function(mu, sigma, x0, t, iters, lines, seed){
+  set.seed(seed)
+  sim <- GBMsimEM(mu[1], sigma[1], x0, t, iters)
+  plot(ts(sim, deltat = t/iters), main = 'Euler-Maruyama approx', ylim = c(0,10),
+       ylab = 'X(w, x(t))', col = 'black')
+  for(i in 1:lines){
+    set.seed(i+seed+4)
+    sim1 <- GBMsimEM(mu[1], sigma[1], x0, t, iters)
+    lines(ts(sim1, deltat = t/iters), col = 'black')
+    sim2 <- GBMsimEM(mu[1], sigma[2], x0, t, iters)
+    lines(ts(sim2, deltat = t/iters), col = 'red')
+    sim3 <- GBMsimEM(mu[2], sigma[1], x0, t, iters)
+    lines(ts(sim3, deltat = t/iters), col = 'blue')
+    sim4 <- GBMsimEM(mu[2], sigma[2], x0, t, iters)
+    lines(ts(sim4, deltat = t/iters), col = 'orange')
+}
+}
+
+par(mfrow = c(1,1))
+plotanalytic(c(1,5), c(1, 0.1), 1, 1, 250, 5, 10)
+plotEM(c(1,5), c(1, 0.1), 1, 1, 250, 5, 10)
+
