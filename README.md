@@ -1,6 +1,6 @@
 # Project IV – Code Repository
 
-This repository contains all the R code used for Project IV, focusing on implementing the Particle Marginal Metropolis-Hastings (PMMH) algorithm and a Gibbs sampler for two models: Lotka-Volterra (LV) and Geometric Brownian Motion (GBM).
+This repository contains all the R code used for my Bayesian Computation for Stochastical Dynamical Systems report, focusing on implementing the Pseudo Marginal Metropolis-Hastings (PMMH) algorithm and a Gibbs sampler for two models: Lotka-Volterra (LV) and Geometric Brownian Motion (GBM).
 
 ## How to Use This Repository
 
