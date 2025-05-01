@@ -147,3 +147,81 @@ par(mfrow = c(1,1))
 plotanalytic(c(1,5), c(1, 0.1), 1, 1, 250, 5, 10)
 plotEM(c(1,5), c(1, 0.1), 1, 1, 250, 5, 10)
 
+
+
+
+
+# Figure 3.1
+
+
+library(ggplot2)
+library(MASS)  # For mvrnorm
+
+# Function to generate latent paths between known observation points
+generate_latent_chain <- function(known_points, times, theta, dt, runs) {
+  all_latent_paths <- list()
+  
+  for (i in 1:(length(times) - 1)) {
+    x0 <- known_points[i, ]     # Start point
+    xT <- known_points[i + 1, ] # End point
+    T_segment <- times[i + 1] - times[i]  # Time duration for this segment
+    
+    # Create valid time grid
+    time_grid <- seq(from = times[i], to = times[i + 1], by = dt)
+    if (length(time_grid) == 0 || !is.finite(times[i + 1])) {
+      next  # Skip iteration if invalid
+    }
+    
+    latent_paths <- replicate(runs, {
+      sim <- DGBmulti(x0, xT, theta, T_segment, dt)
+      sim[, 1]  # Extract first component (adjust if 2D)
+    })
+    
+    # Convert to data frame
+    segment_df <- data.frame(
+      time = rep(time_grid, runs),
+      value = as.vector(latent_paths),
+      path = rep(1:runs, each = length(time_grid))
+    )
+    all_latent_paths[[i]] <- segment_df
+  }
+  
+  # Combine all path segments into one data frame
+  full_latent_df <- do.call(rbind, all_latent_paths)
+  return(full_latent_df)
+}
+
+# Placeholder beta function (Define your actual function)
+beta <- function(xt, theta) {
+  return(matrix(c(0.1, 0, 0, 0.1), nrow = 2))  # Example variance structure
+}
+
+# Define a chain of known points (observed states at specific times)
+known_points <- matrix(c(
+  2, 2,   # x0
+  3, 4,   # Intermediate point
+  5, 6,
+  10,10,
+  20,14# xT
+), ncol = 2, byrow = TRUE)
+
+times <- c(0, 0.5, 1, 1.5, 2)  # Time points for observations
+
+# Parameters
+dt <- 0.1  # Discretization step
+runs <- 10  # Number of latent samples
+theta <- c(0.5, 0.0025, 0.3)  # Example parameters
+
+# Generate latent paths
+latent_chain_df <- generate_latent_chain(known_points, times, theta, dt, runs)
+
+# Observed data points
+observed_df <- data.frame(time = times, value = known_points[, 1])  # Only using first component
+
+# Plot
+ggplot() + 
+  geom_line(data = latent_chain_df, aes(x = time, y = value, group = path, color = as.factor(path)), alpha = 0.7) +
+  geom_point(data = observed_df, aes(x = time, y = value), color = "red", size = 3) +  # Observed points
+  labs(title = "", x = "Time", y = "State") +
+  theme_minimal() +
+  theme(legend.position = "none")
