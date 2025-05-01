@@ -180,30 +180,34 @@ library(deSolve)
 library(MASS)
 library(ggplot2)
 
+
+
+
+# Functions to solve an ODE
+
 # Define ODE system for Lotka-Volterra
-LV_ode <- function(t, state, parameters) {
-  x <- state[1]  # Prey
-  y <- state[2]  # Predator
-  with(as.list(parameters), {
-    dx <- birth_prey * x - predation * x * y
-    dy <- predation * x * y - death_pred * y
-    list(c(dx, dy))
-  })
+LV_ode <- function(t, state, theta) {
+  prey <- state[1]
+  pred <- state[2]
+  dx <- theta[1] * prey - theta[2] * prey * pred
+  dy <- theta[2] * prey * pred - theta[3] * pred
+  list(c(dx, dy))
 }
 
-# Set rate parameters
-params <- c(birth_prey = 0.5, predation = 0.0025, death_pred = 0.3)
+theta <- c(birth_prey = 0.5, predation = 0.0025, death_pred = 0.3)
 
-# Initial conditions (Starting at 50 for both prey and predator)
 x0 <- c(50, 50)
-time_seq <- seq(0, 50, by = 0.1)  # Time points
+time_seq <- seq(0, 50, by = 0.1)  
 
-# Solve ODE
 ode_solution <- ode(y = x0, times = time_seq, func = LV_ode, parms = params)
 ode_df <- as.data.frame(ode_solution)
 colnames(ode_df) <- c("time", "prey", "predator")
 
-# Define stochastic simulation function (Euler-Maruyama method)
+
+
+
+#Functions to perform stochastic simulation
+
 alpha <- function(x, theta) {
   c(theta[1] * x[1] - theta[2] * x[1] * x[2], 
     theta[2] * x[1] * x[2] - theta[3] * x[2])
@@ -225,53 +229,54 @@ LVsimEM <- function(theta, x, T, dt){
   xmat[1,] <- c(time_vals[1], x)
   for(i in 2:iters){
     x <- mvrnorm(1, x + alpha(x, theta) * dt, beta(x, theta) * dt)
-    x[x < 0.001] <- 0.001  # Prevent negative values
+    x[x < 0.001] <- 0.001  
     xmat[i,] <- c(time_vals[i], x)
   }
   return(as.data.frame(xmat))
 }
 
-# Run stochastic simulations
-set.seed(41)  # For reproducibility
+
+
+
+# Run EM simulations
+set.seed(41)  
 theta <- c(0.5, 0.0025, 0.3)
-dt <- 0.01  # Smaller time step for higher accuracy
+dt <- 0.01  
 Tmax <- 50
 n_simulations <- 3
 
 simulations <- lapply(1:n_simulations, function(i) {
   sim <- LVsimEM(theta, x0, Tmax, dt)
   colnames(sim) <- c("time", "prey", "predator")
-  sim$sim_id <- i  # Assign simulation ID
+  sim$sim_id <- i  
   return(sim)
 })
 
-# Convert to data frame
-sim_df <- do.call(rbind, simulations)
+sim_df <- as.data.frame(simulations)
 
-# Set y-axis limits based on reasonable fluctuation
 ylim_range <- c(0, max(ode_df$prey, ode_df$predator, sim_df$prey, sim_df$predator))
 
+
+
+
+
 # Plot Prey Population
-p1 <- ggplot() +
-  geom_line(data = ode_df, aes(x = time, y = prey), color = "black", size = 1) +  # ODE solution
+ggplot() +
+  geom_line(data = ode_df, aes(x = time, y = prey), color = "black", size = 1) +  
   geom_line(data = sim_df, aes(x = time, y = prey, group = sim_id), 
-            color = "blue", size = 0.5, alpha = 0.8) +  # Stochastic simulations (same color)
+            color = "blue", size = 0.5, alpha = 0.8) +  
   labs(title = "Prey Population Over Time", x = "Time", y = "Prey Population") +
   ylim(ylim_range) +
   theme_minimal()
 
 # Plot Predator Population
-p2 <- ggplot() +
-  geom_line(data = ode_df, aes(x = time, y = predator), color = "black", size = 1) +  # ODE solution
+ggplot() +
+  geom_line(data = ode_df, aes(x = time, y = predator), color = "black", size = 1) +  
   geom_line(data = sim_df, aes(x = time, y = predator, group = sim_id), 
-            color = "red", size = 0.5, alpha = 0.8) +  # Stochastic simulations (same color)
+            color = "red", size = 0.5, alpha = 0.8) +  
   labs(title = "Predator Population Over Time", x = "Time", y = "Predator Population") +
   ylim(ylim_range) +
   theme_minimal()
-
-print(p1)
-print(p2)
-
 
 
 
