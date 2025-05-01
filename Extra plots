@@ -225,3 +225,41 @@ ggplot() +
   labs(title = "", x = "Time", y = "State") +
   theme_minimal() +
   theme(legend.position = "none")
+
+
+
+
+
+#Figure 5.1
+
+set.seed(1)
+PMMH_results_initial12 <- PMMH_bridge_multi(c(0.9, 0.05, 0.7), out3, 1, 0.05, 30, 10000, 
+                                           matrix(c(0.001, 0, 0, 0, 0.00001, 0, 0, 0, 0.001), nrow = 3))
+
+PMMH_tune12 <- var(PMMH_results_initial12[[1]][1000:10000,])
+
+set.seed(1)
+PMMH_results_tune12 <- PMMH_bridge_multi(c(0.9, 0.05, 0.7), out3, 1, 0.05, 30, 10000, 
+                                        PMMH_tune12*(2.562)^2/3)
+
+tsplot(PMMH_results_tune12[[1]][5400:10000,1], xlab = 'Iterations', ylab = expression(theta[1]))
+tsplot(PMMH_results_tune12[[1]][5400:10000,2], xlab = 'Iterations', ylab = expression(theta[2]))
+tsplot(PMMH_results_tune12[[1]][5400:10000,3], xlab = 'Iterations', ylab = expression(theta[3]))
+
+
+
+
+#Figure 5.2
+
+set.seed(3)
+Gibbs_results_initial2 <- Gibbs(out3, c(0.9, 0.05, 0.7), matrix(c(0.001, 0, 0, 0, 0.00001, 0, 0, 0, 0.001), nrow = 3),
+                                1, 0.05, 10000)
+
+Gibbs_tune2 <- var(Gibbs_results_initial2[[1]])
+
+set.seed(3)
+Gibbs_results_tune2 <- Gibbs(out3, c(0.9, 0.05, 0.7), Gibbs_tune2*(2.38)^2/3, 1, 0.05, 10000)
+
+tsplot(Gibbs_results_tune2[[1]][100:10000,1], xlab = 'Iterations', ylab = expression(theta[1]))
+tsplot(Gibbs_results_tune2[[1]][100:10000,2], xlab = 'Iterations', ylab = expression(theta[2]))
+tsplot(Gibbs_results_tune2[[1]][100:10000,3], xlab = 'Iterations', ylab = expression(theta[3]))
