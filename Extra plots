@@ -47,41 +47,29 @@ GBMsimEM <- function(mu, sigma, x0, t, iters){
 
 # Code for Figure 2.1
 
-plot_GBM_and_ODE <- function(mu, sigma, x0, t, iters, seed = NULL) {
-  if (!is.null(seed)) set.seed(seed)  # Set seed for reproducibility
-  
+simulate_GBM_vs_ODE <- function(mu, sigma, x0, t, iters, seed) {
+  set.seed(seed)
   dt <- t / iters
-  time <- seq(0, t, length.out = iters + 1)  # Time points
-  
-  # Initialize GBM
-  GBM <- numeric(iters + 1)
-  GBM[1] <- x0
-  
-  # Simulate GBM
-  for (i in 2:(iters + 1)) {
-    GBM[i] <- GBM[i - 1] * exp((mu - 0.5 * sigma^2) * dt + sigma * sqrt(dt) * rnorm(1))
+  time <- seq(0, t, length.out = iters + 1)
+  gbm <- numeric(length(time))
+  gbm[1] <- x0
+  for (i in 2:length(time)) {
+    z <- rnorm(1)
+    gbm[i] <- gbm[i - 1] * exp((mu - 0.5 * sigma^2) * dt + sigma * sqrt(dt) * z)
   }
-  
-  # Compute ODE trajectory (deterministic solution)
-  ODE <- x0 * exp(mu * time)
-  
-  # Plot GBM and ODE
-  plot(
-    time, GBM, type = "l", col = "blue", lwd = 2,
-    ylim = range(c(GBM, ODE)), main = "Geometric Brownian Motion vs ODE",
-    xlab = "Time", ylab = expression(W[t]), las = 1
-  )
-  lines(time, ODE, col = "red", lwd = 2, lty = 2)
-  
-  # Add legend
-  legend(
-    "topleft", legend = c("GBM (stochastic)", "ODE (deterministic)"),
-    col = c("blue", "red"), lwd = 2, lty = c(1, 2)
-  )
+  ode <- x0 * exp(mu * time)
+  return(list(time = time, gbm = gbm, ode = ode))
 }
 
-# Example usage:
-plot_GBM_and_ODE(mu = 0.05, sigma = 0.2, x0 = 1, t = 25, iters = 1000, seed = 5)
+result <- simulate_GBM_vs_ODE(mu = 0.05, sigma = 0.2, x0 = 1, t = 25, iters = 1000, seed = 5)
+
+plot(result$time, result$gbm, type = "l", col = "blue", lwd = 2,
+     ylim = range(c(result$gbm, result$ode)),
+     main = "Geometric Brownian Motion vs ODE",
+     xlab = "Time", ylab = expression(W[t]), las = 1)
+lines(result$time, result$ode, col = "red", lwd = 2, lty = 2)
+legend("topleft", legend = c("GBM (stochastic)", "ODE (deterministic)"),
+       col = c("blue", "red"), lwd = 2, lty = c(1, 2))
 
 
 
@@ -107,45 +95,29 @@ for(i in 1:2){
 
 # Code for Figure 2.3
 
-plotanalytic <- function(mu, sigma, x0, t, iters, lines, seed){
+simulate_GBM_vs_ODE <- function(mu, sigma, x0, t, iters, seed) {
   set.seed(seed)
-  sim <- GBMsim(mu[1], sigma[1], x0, t, iters)
-  plot(ts(sim, deltat = t/iters), main = 'Geometric Brownian Motion', ylim = c(0,10),
-       ylab = 'X(w, x(t))', col = 'black')
-  for(i in 1:lines){
-    set.seed(i+seed+4)
-    sim1 <- GBMsim(mu[1], sigma[1], x0, t, iters)
-    lines(ts(sim1, deltat = t/iters), col = 'black')
-    sim2 <- GBMsim(mu[1], sigma[2], x0, t, iters)
-    lines(ts(sim2, deltat = t/iters), col = 'red')
-    sim3 <- GBMsim(mu[2], sigma[1], x0, t, iters)
-    lines(ts(sim3, deltat = t/iters), col = 'blue')
-    sim4 <- GBMsim(mu[2], sigma[2], x0, t, iters)
-    lines(ts(sim4, deltat = t/iters), col = 'orange')
-}
+  dt <- t / iters
+  time <- seq(0, t, length.out = iters + 1)
+  gbm <- numeric(length(time))
+  gbm[1] <- x0
+  for (i in 2:length(time)) {
+    z <- rnorm(1)
+    gbm[i] <- gbm[i - 1] * exp((mu - 0.5 * sigma^2) * dt + sigma * sqrt(dt) * z)
+  }
+  ode <- x0 * exp(mu * time)
+  return(list(time = time, gbm = gbm, ode = ode))
 }
 
-plotEM <- function(mu, sigma, x0, t, iters, lines, seed){
-  set.seed(seed)
-  sim <- GBMsimEM(mu[1], sigma[1], x0, t, iters)
-  plot(ts(sim, deltat = t/iters), main = 'Euler-Maruyama approx', ylim = c(0,10),
-       ylab = 'X(w, x(t))', col = 'black')
-  for(i in 1:lines){
-    set.seed(i+seed+4)
-    sim1 <- GBMsimEM(mu[1], sigma[1], x0, t, iters)
-    lines(ts(sim1, deltat = t/iters), col = 'black')
-    sim2 <- GBMsimEM(mu[1], sigma[2], x0, t, iters)
-    lines(ts(sim2, deltat = t/iters), col = 'red')
-    sim3 <- GBMsimEM(mu[2], sigma[1], x0, t, iters)
-    lines(ts(sim3, deltat = t/iters), col = 'blue')
-    sim4 <- GBMsimEM(mu[2], sigma[2], x0, t, iters)
-    lines(ts(sim4, deltat = t/iters), col = 'orange')
-}
-}
+result <- simulate_GBM_vs_ODE(mu = 0.05, sigma = 0.2, x0 = 1, t = 25, iters = 1000, seed = 5)
 
-par(mfrow = c(1,1))
-plotanalytic(c(1,5), c(1, 0.1), 1, 1, 250, 5, 10)
-plotEM(c(1,5), c(1, 0.1), 1, 1, 250, 5, 10)
+plot(result$time, result$gbm, type = "l", col = "blue", lwd = 2,
+     ylim = range(c(result$gbm, result$ode)),
+     main = "Geometric Brownian Motion vs ODE",
+     xlab = "Time", ylab = expression(W[t]), las = 1)
+lines(result$time, result$ode, col = "red", lwd = 2, lty = 2)
+legend("topleft", legend = c("GBM (stochastic)", "ODE (deterministic)"),
+       col = c("blue", "red"), lwd = 2, lty = c(1, 2))
 
 
 
@@ -155,74 +127,64 @@ plotEM(c(1,5), c(1, 0.1), 1, 1, 250, 5, 10)
 
 
 library(ggplot2)
-library(MASS)  # For mvrnorm
+library(MASS)
 
-# Function to generate latent paths between known observation points
-generate_latent_chain <- function(known_points, times, theta, dt, runs) {
-  all_latent_paths <- list()
-  
-  for (i in 1:(length(times) - 1)) {
-    x0 <- known_points[i, ]     # Start point
-    xT <- known_points[i + 1, ] # End point
-    T_segment <- times[i + 1] - times[i]  # Time duration for this segment
+#Function to generate synthetic paths
+
+generate_latent_chain <- function(known_states, observation_times, theta, dt, n_paths) {
+  path_segments <- list()
+  for (i in 1:(length(observation_times) - 1)) {
+    start_state <- known_states[i, ]
+    end_state <- known_states[i + 1, ]
+    duration <- observation_times[i + 1] - observation_times[i]
+    time_grid <- seq(observation_times[i], observation_times[i + 1], by = dt)
     
-    # Create valid time grid
-    time_grid <- seq(from = times[i], to = times[i + 1], by = dt)
-    if (length(time_grid) == 0 || !is.finite(times[i + 1])) {
-      next  # Skip iteration if invalid
-    }
-    
-    latent_paths <- replicate(runs, {
-      sim <- DGBmulti(x0, xT, theta, T_segment, dt)
-      sim[, 1]  # Extract first component (adjust if 2D)
+    segment_paths <- replicate(n_paths, {
+      sim <- DGBmulti(start_state, end_state, theta, duration, dt)
+      sim[, 1]  
     })
-    
-    # Convert to data frame
+
     segment_df <- data.frame(
-      time = rep(time_grid, runs),
-      value = as.vector(latent_paths),
-      path = rep(1:runs, each = length(time_grid))
+      time = rep(time_grid, n_paths),
+      value = as.vector(segment_paths),
+      path_id = rep(1:n_paths, each = length(time_grid))
     )
-    all_latent_paths[[i]] <- segment_df
+    path_segments[[i]] <- segment_df
   }
-  
-  # Combine all path segments into one data frame
-  full_latent_df <- do.call(rbind, all_latent_paths)
-  return(full_latent_df)
+  full_paths <- do.call(rbind, path_segments)
+  return(full_paths)
 }
 
-# Placeholder beta function (Define your actual function)
-beta <- function(xt, theta) {
-  return(matrix(c(0.1, 0, 0, 0.1), nrow = 2))  # Example variance structure
+#Generate data to simulate draws
+
+beta <- function(x, theta) {
+  matrix(c(1, 0, 0, 1), nrow = 2)
 }
 
-# Define a chain of known points (observed states at specific times)
-known_points <- matrix(c(
-  2, 2,   # x0
-  3, 4,   # Intermediate point
+observed_states <- matrix(c(
+  2, 2,
+  3, 4,
   5, 6,
-  10,10,
-  20,14# xT
+  10, 10,
+  20, 14
 ), ncol = 2, byrow = TRUE)
 
-times <- c(0, 0.5, 1, 1.5, 2)  # Time points for observations
+observation_times <- c(0, 0.5, 1, 1.5, 2)
+theta <- c(0.5, 0.0025, 0.3)
+dt <- 0.1
+n_paths <- 10
 
-# Parameters
-dt <- 0.1  # Discretization step
-runs <- 10  # Number of latent samples
-theta <- c(0.5, 0.0025, 0.3)  # Example parameters
+latent_paths <- generate_latent_chain(observed_states, observation_times, theta, dt, n_paths)
 
-# Generate latent paths
-latent_chain_df <- generate_latent_chain(known_points, times, theta, dt, runs)
+observed_df <- data.frame(
+  time = observation_times,
+  value = observed_states[, 1]  
+)
 
-# Observed data points
-observed_df <- data.frame(time = times, value = known_points[, 1])  # Only using first component
-
-# Plot
-ggplot() + 
-  geom_line(data = latent_chain_df, aes(x = time, y = value, group = path, color = as.factor(path)), alpha = 0.7) +
-  geom_point(data = observed_df, aes(x = time, y = value), color = "red", size = 3) +  # Observed points
-  labs(title = "", x = "Time", y = "State") +
+ggplot() +
+  geom_line(data = latent_paths, aes(x = time, y = value, group = path_id, color = as.factor(path_id)), alpha = 0.7) +
+  geom_point(data = observed_df, aes(x = time, y = value), color = "red", size = 3) +
+  labs(x = "Time", y = "State", title = "Latent Path Simulation Between Observations") +
   theme_minimal() +
   theme(legend.position = "none")
 
