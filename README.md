@@ -14,8 +14,9 @@ These are the central parts of the project and contain the core algorithms used 
 
 ### 2. Generate the Figures and Tables
 Once you’ve run the core scripts, you can move on to the plotting scripts:
-- Scripts for **GBM and LV** will generate the main figures and tables that appear in the report.
-- These plots are based on the output of the core algorithms.
+- **PMMH for LV observation time**
+- **PMMH for LV partition interval**
+- **PMMH for GBM**
 
 ### 3. Additional Plots and Analysis
 There are a couple of extra sections worth checking out:
