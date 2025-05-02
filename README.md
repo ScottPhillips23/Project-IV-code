@@ -15,8 +15,8 @@ These are the central parts of the project and contain the core algorithms used 
 ### 2. Generate the Figures and Tables
 Once you’ve run the core scripts, you can move on to the plotting scripts:
 - **PMMH for LV observation time**
-- **PMMH for LV partition interval**
-- **PMMH for GBM**
+- **PMMH for LV partition intervals**
+- **PMMH for GBM figures**
 
 ### 3. Additional Plots and Analysis
 There are a couple of extra sections worth checking out:
