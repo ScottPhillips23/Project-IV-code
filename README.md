@@ -6,8 +6,8 @@ This repository contains all the R code used for my Bayesian Computation for Sto
 
 ### 1. Start with the Core Scripts
 Begin by looking at the main scripts:
-- **PMMH for LV**
-- **PMMH for GBM**
+- **Pseudo-marginal Metropolis-Hastings for Lotka-Volterra**
+- **Pseudo-marginal Metropolis-Hastings for Geometric Brownian Motion**
 - **Gibbs Sampler**
 
 These are the central parts of the project and contain the core algorithms used in the analysis.
